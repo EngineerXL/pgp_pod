@@ -67,7 +67,6 @@ void read_obj(int id, std::string fname) {
             }
             assert(trigs.size() == 2);
             double t;
-            bool unused_flag;
             int id1 = trig_ids[0];
             int id2 = trig_ids[1];
             triangle trig1 = trigs[0];
@@ -86,8 +85,8 @@ void read_obj(int id, std::string fname) {
 
             triangle edge1(vi1, vj2, vi2);
             edge1.check_norm(n_avg);
-            intersect_ray_polygon(ray(vec3d(0, 0, 0), vi, -1),
-                                  polygon(edge1, EDGE_COLOR), t, unused_flag);
+            intersect_ray_plane(ray(vec3d(0, 0, 0), vi, -1),
+                                polygon(edge1, EDGE_COLOR), t);
             triangle corneri(vi1, vi2, t * vi / vi.len());
             corneri.check_norm(n_avg);
 
@@ -99,8 +98,8 @@ void read_obj(int id, std::string fname) {
 
             triangle edge2(vi1, vj1, vj2);
             edge2.check_norm(n_avg);
-            intersect_ray_polygon(ray(vec3d(0, 0, 0), vj, -1),
-                                  polygon(edge2, EDGE_COLOR), t, unused_flag);
+            intersect_ray_plane(ray(vec3d(0, 0, 0), vj, -1),
+                                polygon(edge2, EDGE_COLOR), t);
             triangle cornerj(vj1, t * vj / vj.len(), vj2);
             cornerj.check_norm(n_avg);
 
@@ -170,7 +169,7 @@ __host__ __device__ vec3f phong_shading(const ray r, const vec3d hit,
     for (int j = 0; j < n_sources; ++j) {
         double t_max = (lights[j].p - hit).len();
         ray r_light(hit, lights[j].p - hit, r.pix_id);
-        vec3f coef_vis(1, 1, 1);
+        vec3f coef_vis(1.0f, 1.0f, 1.0f);
         for (int i = 0; i < n_polygons; ++i) {
             if (i == id) {
                 continue;
@@ -185,20 +184,22 @@ __host__ __device__ vec3f phong_shading(const ray r, const vec3d hit,
         vec3f clr_a =
             poly.coef_blend * r.coef * coef_vis * lights[j].i * poly_color;
         double coef_diffusal = vec3d::dot(poly.trig.n, r_light.v);
-        vec3d reflected = vec3d::reflect(r_light.v, poly.trig.n);
-        double coef_specular = vec3d::dot(reflected, r.v);
-        if (coef_specular < 0.0) {
-            coef_specular = 0.0;
-        }
+        double coef_specular = 0.0;
         if (coef_diffusal < 0.0) {
             coef_diffusal = 0.0;
-            coef_specular = 0.0;
+        } else {
+            vec3d reflected = vec3d::reflect(r_light.v, poly.trig.n);
+            coef_specular = vec3d::dot(reflected, r.v);
+            if (coef_specular < 0.0) {
+                coef_specular = 0.0;
+            } else {
+                coef_specular = std::pow(coef_specular, 9);
+            }
         }
-        coef_specular = std::pow(coef_specular, 9);
         clr +=
             COEF_SOURCE * (K_D * coef_diffusal + K_S * coef_specular) * clr_a;
-        clr.clamp();
     }
+    clr.clamp();
     return clr;
 }
 

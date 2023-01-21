@@ -9,7 +9,7 @@ FLAGS_NVCC = -O2 -std=c++11 -Werror cross-execution-space-call -lm
 
 BIN = cw_pod
 # Compile solution
-$(BIN): main.cu src/io.cuh src/polygon.cuh src/ray_cpu.cuh src/ray_gpu.cuh src/ssaa.cuh src/textures.cuh src/utils.cuh src/variables_cpu.cuh src/variables_gpu.cuh src/vector3d.cuh
+$(BIN): main.cu src/io.cuh src/polygon.cuh src/ray_cpu.cuh src/ray_gpu.cuh src/scene.cuh src/ssaa.cuh src/textures.cuh src/utils.cuh src/variables_cpu.cuh src/variables_gpu.cuh src/vector3d.cuh
 	$(NVCC) $(FLAGS_NVCC) main.cu -o $(BIN)
 
 MAX_FRAMES = 8192

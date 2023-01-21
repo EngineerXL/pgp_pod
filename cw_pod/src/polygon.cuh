@@ -25,21 +25,21 @@ struct ray3d_t {
 using ray = ray3d_t;
 
 struct triangle3d_t {
-    vec3d a, b, c, n;
-    double s;
+    vec3d a, b, c, n, e1, e2;
 
     triangle3d_t() = delete;
 
-    __host__ __device__ void calc_n_s() {
+    __host__ __device__ void init_triangle() {
         n = vec3d::cross(b - a, c - a);
-        s = n.len();
         n.norm();
+        e1 = b - a;
+        e2 = c - a;
     }
 
     __host__ __device__ triangle3d_t(const vec3d& _a, const vec3d& _b,
                                      const vec3d& _c)
         : a(_a), b(_b), c(_c) {
-        calc_n_s();
+        init_triangle();
     }
 
     __host__ __device__ void shift(const vec3d& v) {
@@ -61,7 +61,7 @@ struct triangle3d_t {
     void check_norm(const vec3d& _n) {
         if (vec3d::dot(_n, n) < -EPS) {
             std::swap(a, c);
-            calc_n_s();
+            init_triangle();
         }
     }
 };
@@ -200,22 +200,33 @@ struct polygon3d_t {
 
 using polygon = polygon3d_t;
 
+__host__ __device__ void intersect_ray_plane(const ray& r, const polygon& poly,
+                                             double& _t) {
+    _t = -(poly.a * r.p.x + poly.b * r.p.y + poly.c * r.p.z + poly.d) /
+         (poly.a * r.v.x + poly.b * r.v.y + poly.c * r.v.z);
+}
+
 __host__ __device__ void intersect_ray_polygon(const ray& r,
                                                const polygon& poly, double& _t,
                                                bool& ans) {
-    _t = -(poly.a * r.p.x + poly.b * r.p.y + poly.c * r.p.z + poly.d) /
-         (poly.a * r.v.x + poly.b * r.v.y + poly.c * r.v.z);
-    if (_t < 0) {
-        ans = false;
+    ans = false;
+    vec3d P = vec3d::cross(r.v, poly.trig.e2);
+    double div = vec3d::dot(P, poly.trig.e1);
+    if (fabs(div) < EPS) {
         return;
     }
-    vec3d res = r.p + _t * r.v;
-    ans = (fabs(vec3d::square(poly.trig.a - res, poly.trig.b - res) +
-                vec3d::square(poly.trig.b - res, poly.trig.c - res) +
-                vec3d::square(poly.trig.c - res, poly.trig.a - res) -
-                poly.trig.s) < EPS
-               ? true
-               : false);
+    vec3d T = r.p - poly.trig.a;
+    double u = vec3d::dot(P, T) / div;
+    if (u < 0.0 || u > 1.0) {
+        return;
+    }
+    vec3d Q = vec3d::cross(T, poly.trig.e1);
+    double v = vec3d::dot(Q, r.v) / div;
+    if (v < 0.0 || u + v > 1.0) {
+        return;
+    }
+    _t = vec3d::dot(Q, poly.trig.e2) / div;
+    ans = (_t < 0.0 ? false : true);
 }
 
 #endif /* POLYGON_HPP */
